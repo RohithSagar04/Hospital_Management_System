@@ -26,10 +26,11 @@ class Patient(TimeStampedModel):
 class Doctor(TimeStampedModel):
     name = models.CharField(max_length=120)
     specialization = models.CharField(max_length=120)
+    designation = models.CharField(max_length=120, blank=True, default='Consultant')
     consultation_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return self.name
+        return f'{self.designation} {self.name}'
 
 
 class DoctorProfile(TimeStampedModel):

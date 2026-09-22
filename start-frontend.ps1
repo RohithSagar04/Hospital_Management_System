@@ -1,11 +1,11 @@
-# ── Hospital Management System – Frontend Startup Script ────────────────────
-# Run this script from the project root:  .\start-frontend.ps1
+# Hospital Management System - Frontend Startup Script
+# Run this script from the project root: .\start-frontend.ps1
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "====================================================" -ForegroundColor Magenta
-Write-Host "  Hospital Management System  –  React Frontend" -ForegroundColor Magenta
+Write-Host "  Hospital Management System - React Frontend" -ForegroundColor Magenta
 Write-Host "====================================================" -ForegroundColor Magenta
 Write-Host ""
 
@@ -17,7 +17,7 @@ if (-not (Test-Path ".\node_modules")) {
     Write-Host "[1/2] Installing npm dependencies..." -ForegroundColor Yellow
     npm install
 } else {
-    Write-Host "[1/2] node_modules found – skipping install." -ForegroundColor Green
+    Write-Host "[1/2] node_modules found - skipping install." -ForegroundColor Green
 }
 
 # Start Vite dev server

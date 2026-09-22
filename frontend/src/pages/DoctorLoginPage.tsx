@@ -17,6 +17,9 @@ export default function DoctorLoginPage() {
     setLoading(true); setError(''); setIsPending(false)
     try {
       const res = await loginDoctor(email.trim().toLowerCase(), password)
+      localStorage.removeItem('hms_admin')
+      localStorage.removeItem('hms_admin_user')
+      localStorage.removeItem('hms_patient')
       localStorage.setItem('hms_doctor', JSON.stringify(res.data))
       navigate('/doctor')
     } catch (err: any) {

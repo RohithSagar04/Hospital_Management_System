@@ -16,10 +16,18 @@ export default function LoginPage() {
     setLoading(true); setError('')
     try {
       const res = await loginPatient(patientId.trim().toUpperCase(), password)
-      localStorage.setItem('hms_patient', JSON.stringify(res.data))
-      navigate('/')
+      if (res.data && res.data.patient_id) {
+        localStorage.removeItem('hms_admin')
+        localStorage.removeItem('hms_admin_user')
+        localStorage.removeItem('hms_doctor')
+        localStorage.setItem('hms_patient', JSON.stringify(res.data))
+        navigate('/')
+      } else {
+        setError('Unexpected response format. Please try again.')
+      }
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Login failed. Please check your Patient ID and password.')
+      const errorMessage = err?.response?.data?.error || err?.message || 'Login failed. Please check your Patient ID and password.'
+      setError(errorMessage)
     }
     setLoading(false)
   }

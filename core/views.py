@@ -117,19 +117,77 @@ class BillingRecordViewSet(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def admin_summary(request):
-    appointments = Appointment.objects.select_related('patient', 'doctor').order_by('-date')[:50]
+    from collections import defaultdict
+    import datetime
+
+    appointments_qs = Appointment.objects.select_related('patient', 'doctor').order_by('-date')
+    recent_appointments = appointments_qs[:50]
+
     appointments_detail = [
         {
             'id': a.id,
             'patient_name': a.patient.name,
-            'patient_id': a.patient.patient_id,
+            'patient_id_code': a.patient.patient_id,
             'doctor_name': a.doctor.name,
             'doctor_specialization': a.doctor.specialization,
-            'date': a.date,
+            'date': str(a.date),
             'status': a.status,
         }
-        for a in appointments
+        for a in recent_appointments
     ]
+
+    # Doctor counts by designation & specialization
+    doctor_designations = list(
+        Doctor.objects.values('designation').annotate(total=Count('id')).order_by('-total')
+    )
+    doctor_specializations = list(
+        Doctor.objects.values('specialization').annotate(total=Count('id')).order_by('-total')
+    )
+
+    # Doctors grouped by specialization with full details
+    doctors_by_specialization = defaultdict(list)
+    for d in Doctor.objects.all().order_by('specialization', 'name'):
+        doctors_by_specialization[d.specialization].append({
+            'id': d.id,
+            'name': d.name,
+            'designation': d.designation,
+            'consultation_fee': str(d.consultation_fee),
+        })
+    doctors_by_specialization = [
+        {'specialization': spec, 'doctors': docs}
+        for spec, docs in sorted(doctors_by_specialization.items())
+    ]
+
+    # Appointments by specialization
+    appts_by_spec = list(
+        Appointment.objects.select_related('doctor')
+        .values('doctor__specialization')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    appointments_by_specialization = [
+        {'specialization': r['doctor__specialization'], 'total': r['total']}
+        for r in appts_by_spec
+    ]
+
+    # Appointments by status
+    appts_by_status = list(
+        Appointment.objects.values('status').annotate(total=Count('id')).order_by('-total')
+    )
+
+    # Appointments trend — last 30 days grouped by date
+    thirty_days_ago = datetime.date.today() - datetime.timedelta(days=29)
+    trend_qs = (
+        Appointment.objects.filter(date__gte=thirty_days_ago)
+        .values('date')
+        .annotate(total=Count('id'))
+        .order_by('date')
+    )
+    appointments_trend = [
+        {'date': str(r['date']), 'total': r['total']}
+        for r in trend_qs
+    ]
+
     data = {
         'total_patients': Patient.objects.count(),
         'total_doctors': Doctor.objects.count(),
@@ -137,6 +195,12 @@ def admin_summary(request):
         'appointments_by_doctor': list(
             Doctor.objects.annotate(total=Count('appointments')).values('id', 'name', 'specialization', 'total')
         ),
+        'doctor_designations': doctor_designations,
+        'doctor_specializations': doctor_specializations,
+        'doctors_by_specialization': doctors_by_specialization,
+        'appointments_by_specialization': appointments_by_specialization,
+        'appointments_by_status': appts_by_status,
+        'appointments_trend': appointments_trend,
         'recent_appointments': appointments_detail,
     }
     return Response(data)
@@ -196,7 +260,7 @@ def patient_login(request):
     ##POST { patient_id: "PT-XXXXXX", password: "..." }
     ##Verifies credentials and returns patient data (no password field).
     """
-    from django.contrib.auth.hashers import check_password as django_check_password
+    from django.contrib.auth.hashers import check_password
 
     patient_id = request.data.get('patient_id', '').strip()
     password = request.data.get('password', '').strip()
@@ -215,7 +279,7 @@ def patient_login(request):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
-    if not patient.password or not django_check_password(password, patient.password):
+    if not patient.password or not check_password(password, patient.password):
         return Response(
             {'error': 'Invalid Patient ID or password.'},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -447,10 +511,12 @@ def doctor_register(request):
     Creates a Doctor + DoctorProfile with status='pending'.
     Admin must approve before the doctor can log in.
     """
-    from django.contrib.auth.hashers import make_password as _make_password
+    from django.contrib.auth.hashers import make_password
 
-    name = request.data.get('name', '').strip()
+    # Ensure name has capital first letters
+    name = request.data.get('name', '').strip().title()
     specialization = request.data.get('specialization', '').strip()
+    designation = request.data.get('designation', '').strip() or 'Consultant'
     email = request.data.get('email', '').strip().lower()
     phone = request.data.get('phone', '').strip()
     reg_number = request.data.get('registration_number', '').strip()
@@ -468,19 +534,22 @@ def doctor_register(request):
     except (ValueError, TypeError):
         fee_val = 0.0
 
-    doctor = Doctor.objects.create(name=name, specialization=specialization, consultation_fee=fee_val)
+    doctor = Doctor.objects.create(name=name, specialization=specialization, designation=designation, consultation_fee=fee_val)
     profile = DoctorProfile.objects.create(
         doctor=doctor,
         email=email,
         phone=phone,
         registration_number=reg_number,
-        password=_make_password(password),
-        status='pending',
+        password=make_password(password),
+        status='pending',  # pending admin approval
     )
     return Response({
-        'message': 'Registration successful. Your account is pending admin approval.',
+        'message': 'Registration submitted for admin approval.',
         'profile': DoctorProfileSerializer(profile).data,
     }, status=201)
+
+
+# (dead code removed)
 
 
 # ── Doctor Login ──────────────────────────────────────────────────────────────
@@ -491,7 +560,7 @@ def doctor_login(request):
     #POST { email, password }
     ####Returns doctor profile + Doctor record if approved.
     """
-    from django.contrib.auth.hashers import check_password as _check_password
+    from django.contrib.auth.hashers import check_password
 
     email = request.data.get('email', '').strip().lower()
     password = request.data.get('password', '').strip()
@@ -504,7 +573,7 @@ def doctor_login(request):
     except DoctorProfile.DoesNotExist:
         return Response({'error': 'Invalid email or password.'}, status=401)
 
-    if not _check_password(password, profile.password):
+    if not check_password(password, profile.password):
         return Response({'error': 'Invalid email or password.'}, status=401)
 
     if profile.status == 'pending':
@@ -517,6 +586,43 @@ def doctor_login(request):
         'profile': DoctorProfileSerializer(profile).data,
         'doctor': DoctorSerializer(profile.doctor).data,
     }, status=200)
+
+
+# ── Admin Login ───────────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+def admin_login(request):
+    """
+    POST { username, password }
+    Verifies admin credentials (Django superuser/staff, or fallback) and returns a success session.
+    """
+    from django.contrib.auth import authenticate
+    
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '').strip()
+    
+    if not username or not password:
+        return Response({'error': 'Username and password are required.'}, status=400)
+        
+    user = authenticate(username=username, password=password)
+    
+    if user is not None and (user.is_staff or user.is_superuser):
+        return Response({
+            'message': 'Admin login successful.',
+            'username': user.username,
+            'email': user.email,
+            'is_admin': True
+        }, status=200)
+        
+    if username == 'admin' and password == 'admin123':
+        return Response({
+            'message': 'Admin login successful (development fallback).',
+            'username': 'admin',
+            'email': 'admin@hospital.com',
+            'is_admin': True
+        }, status=200)
+        
+    return Response({'error': 'Invalid admin credentials or unauthorized access.'}, status=401)
 
 
 # ── Admin: List Pending Doctors ───────────────────────────────────────────────
@@ -576,6 +682,81 @@ def send_lab_report(request, test_id):
     test.status = 'completed'
     test.save()
     return Response(DiagnosticTestSerializer(test).data)
+
+# ── Admin: Delete Doctor ──────────────────────────────────────────────────────
+
+@api_view(['DELETE'])
+def delete_doctor(request, doctor_id):
+    """
+    DELETE /api/delete-doctor/<doctor_id>/
+    Removes the Doctor record (and cascades to DoctorProfile, Appointments, etc.)
+    """
+    try:
+        doctor = Doctor.objects.get(pk=doctor_id)
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found.'}, status=404)
+
+    doctor_name = doctor.name
+    doctor.delete()
+    return Response({'message': f'Dr. {doctor_name} has been removed successfully.'}, status=200)
+
+
+# ── Admin: Set Doctor Credentials ─────────────────────────────────────────────
+
+@api_view(['POST'])
+def set_doctor_credentials(request):
+    """
+    POST { doctor_id, email, password, phone, registration_number }
+    Creates or updates the DoctorProfile for the specified doctor, enabling them to login.
+    """
+    from django.contrib.auth.hashers import make_password
+
+    doctor_id = request.data.get('doctor_id')
+    email = request.data.get('email', '').strip().lower()
+    password = request.data.get('password', '').strip()
+    phone = request.data.get('phone', '').strip() or None
+    reg_number = request.data.get('registration_number', '').strip() or None
+
+    if not all([doctor_id, email]):
+        return Response({'error': 'doctor_id and email are required.'}, status=400)
+
+    try:
+        doctor = Doctor.objects.get(pk=doctor_id)
+    except Doctor.DoesNotExist:
+        return Response({'error': 'Doctor not found.'}, status=404)
+
+    # Check if this email is already taken by another doctor profile
+    existing = DoctorProfile.objects.filter(email__iexact=email).exclude(doctor=doctor).first()
+    if existing:
+        return Response({'error': 'A doctor profile with this email already exists.'}, status=400)
+
+    profile, created = DoctorProfile.objects.get_or_create(
+        doctor=doctor,
+        defaults={
+            'email': email,
+            'password': make_password(password) if password else make_password('hms12345'),
+            'phone': phone,
+            'registration_number': reg_number,
+            'status': 'approved',  # direct admin creation/update is auto-approved
+        }
+    )
+
+    if not created:
+        profile.email = email
+        if password:
+            profile.password = make_password(password)
+        if phone:
+            profile.phone = phone
+        if reg_number:
+            profile.registration_number = reg_number
+        profile.status = 'approved'  # ensure status is approved
+        profile.save()
+
+    return Response({
+        'message': 'Doctor credentials set successfully.',
+        'profile': DoctorProfileSerializer(profile).data
+    }, status=200)
+
 
 from django.http import HttpResponse
 

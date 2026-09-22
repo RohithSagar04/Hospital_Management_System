@@ -8,6 +8,7 @@ import {
 import {
   getPatients, getConsultations, getPrescriptions, getDiagnostics,
   getAppointments, addConsultation, addPrescription, addDiagnostic, aiDrugRecommendation,
+  updateAppointment,
   type Doctor, type Patient, type ConsultationNote, type Prescription,
   type DiagnosticTest, type Appointment, type DoctorProfile,
 } from '../api'
@@ -17,6 +18,7 @@ function Badge({ status }: { status: string }) {
     scheduled: 'bg-amber-500/15 text-amber-300', completed: 'bg-emerald-500/15 text-emerald-300',
     cancelled: 'bg-red-500/15 text-red-300', requested: 'bg-blue-500/15 text-blue-300',
     'in-progress': 'bg-violet-500/15 text-violet-300',
+    processed: 'bg-emerald-500/15 text-emerald-300',
   }
   return <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${map[status] ?? 'bg-slate-700 text-slate-400'}`}>{status}</span>
 }
@@ -61,6 +63,18 @@ export default function DoctorDashboard() {
     setAllAppointments(res.data); setApptLoading(false)
   }
 
+  const handleMarkProcessed = async (appointmentId: number) => {
+    try {
+      await updateAppointment(appointmentId, { status: 'processed' })
+      if (session) {
+        await loadAppointments(session.doctor.id)
+      }
+      flash('Appointment marked as processed.')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const logout = () => { localStorage.removeItem('hms_doctor'); navigate('/doctor-login') }
 
   const searchPatient = async () => {
@@ -101,9 +115,23 @@ export default function DoctorDashboard() {
   }
 
   const runAI = async () => {
+    if (!aiDisease.trim() && !aiSymptoms.trim()) {
+      setAiResult('⚠️ Please enter a disease name or symptoms first.');
+      return;
+    }
     setAiLoading(true); setAiResult('')
-    try { const res = await aiDrugRecommendation(aiDisease, aiSymptoms, patient?.age); setAiResult(res.data.recommendation) }
-    catch { setAiResult('AI service unavailable.') }
+    try { 
+      const res = await aiDrugRecommendation(aiDisease, aiSymptoms, patient?.age); 
+      if (res.data && res.data.recommendation) {
+        setAiResult(res.data.recommendation);
+      } else {
+        setAiResult('⚠️ AI returned an empty response. Please try again.');
+      }
+    }
+    catch (err) { 
+      console.error('AI Recommendation Error:', err);
+      setAiResult('❌ AI service unavailable. Please check if the backend server is running and reachable.');
+    }
     setAiLoading(false)
   }
 
@@ -124,7 +152,14 @@ export default function DoctorDashboard() {
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div className="space-y-5">
+    <div className="relative min-h-screen rounded-2xl border border-slate-800 bg-slate-950/60 backdrop-blur-sm overflow-hidden p-6">
+      {/* Professional Dashboard Background Image */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-10 bg-no-repeat bg-cover bg-center"
+        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1600&q=80')` }}
+      />
+
+      <div className="relative z-10 space-y-5">
 
       {/* Doctor Identity Card */}
       <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-950/40 via-slate-900/80 to-slate-900/70 p-6 shadow-lg">
@@ -160,7 +195,7 @@ export default function DoctorDashboard() {
           <button key={t.key} onClick={() => setDashTab(t.key)}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition border ${ dashTab === t.key ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-slate-800/60 text-slate-400 border-slate-700/40 hover:bg-slate-700'}`}>
             {t.icon} {t.label}
-            {'count' in t && t.count > 0 && <span className="rounded-full bg-violet-500/30 text-violet-200 text-xs px-1.5 py-0.5 font-bold leading-none">{t.count}</span>}
+            {t.count !== undefined && t.count > 0 && <span className="rounded-full bg-violet-500/30 text-violet-200 text-xs px-1.5 py-0.5 font-bold leading-none">{t.count}</span>}
           </button>
         ))}
       </div>
@@ -192,10 +227,18 @@ export default function DoctorDashboard() {
                       <p className="text-sm text-slate-200 flex items-center gap-1 justify-end mb-1"><Calendar size={11} />{a.date}</p>
                       <Badge status={a.status} />
                     </div>
-                    <button onClick={() => { setDashTab('search'); setPatientId(a.patient_id_code); setTimeout(() => document.getElementById('dr-pid-input')?.focus(), 100) }}
-                      className="shrink-0 text-xs text-violet-400 hover:text-violet-300 border border-violet-500/30 rounded-lg px-2 py-1 hover:bg-violet-500/10 transition">
-                      View →
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {a.status === 'scheduled' && (
+                        <button onClick={() => handleMarkProcessed(a.id)}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded-lg px-2 py-1 hover:bg-emerald-500/10 transition flex items-center gap-1">
+                          <BadgeCheck size={12} /> Process
+                        </button>
+                      )}
+                      <button onClick={() => { setDashTab('search'); setPatientId(a.patient_id_code); setTimeout(() => document.getElementById('dr-pid-input')?.focus(), 100) }}
+                        className="text-xs text-violet-400 hover:text-violet-300 border border-violet-500/30 rounded-lg px-2 py-1 hover:bg-violet-500/10 transition">
+                        View →
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -366,6 +409,8 @@ export default function DoctorDashboard() {
           )}
         </div>
       )}
+
+      </div> {/* relative z-10 space-y-5 */}
     </div>
   )
 }

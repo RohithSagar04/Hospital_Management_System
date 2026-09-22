@@ -1,11 +1,11 @@
-# ── Hospital Management System – Backend Startup Script ─────────────────────
-# Run this script from the project root:  .\start-backend.ps1
+# Hospital Management System - Backend Startup Script
+# Run this script from the project root: .\start-backend.ps1
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "====================================================" -ForegroundColor Cyan
-Write-Host "  Hospital Management System  –  Django Backend" -ForegroundColor Cyan
+Write-Host "  Hospital Management System - Django Backend" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host ""
 

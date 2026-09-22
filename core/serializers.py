@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = '__all__'
+        fields = ['id', 'name', 'age', 'gender', 'phone', 'address', 'patient_id', 'token_number', 'created_at', 'updated_at', 'password']
         # Never send the hashed password back to the client
         extra_kwargs = {'password': {'write_only': True, 'required': False}}
 
@@ -36,6 +36,7 @@ class DoctorSerializer(serializers.ModelSerializer):
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     # Nested read-only fields from the linked Doctor record
+    doctor_designation = serializers.CharField(source='doctor.designation', read_only=True)
     doctor_name = serializers.CharField(source='doctor.name', read_only=True)
     specialization = serializers.CharField(source='doctor.specialization', read_only=True)
     consultation_fee = serializers.DecimalField(source='doctor.consultation_fee', max_digits=10, decimal_places=2, read_only=True)
@@ -44,7 +45,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            'id', 'doctor_id', 'doctor_name', 'specialization', 'consultation_fee',
+            'id', 'doctor_id', 'doctor_name', 'doctor_designation',
+            'specialization', 'consultation_fee',
             'email', 'phone', 'registration_number', 'status', 'created_at',
         ]
         # password is never serialized out

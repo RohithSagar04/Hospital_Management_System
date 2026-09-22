@@ -11,28 +11,34 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
-# mysqlclient is used as the native MySQL driver
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from project root
+# Load .env from project root (only has effect locally; Render uses dashboard env vars)
 load_dotenv(Path(__file__).resolve().parent.parent / '.env')
-
-# mysqlclient (native C driver) is installed — no shim needed
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ---------------------------------------------------------------------------
+# Core security
+# ---------------------------------------------------------------------------
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-change-me')
+# On Render: set SECRET_KEY in the Environment Variables dashboard.
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-change-me-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+# On Render: leave DEBUG unset (defaults to False). Set DEBUG=True only locally.
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['*']
+# Allow all hosts — safe because Render sits behind a reverse proxy.
+# You can lock this down to your Render hostname if preferred.
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
-
+# ---------------------------------------------------------------------------
 # Application definition
+# ---------------------------------------------------------------------------
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -48,6 +54,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise must come directly after SecurityMiddleware and before all others
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -76,63 +84,69 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
+# ---------------------------------------------------------------------------
+# Database — SQLite (default, works on Render with ephemeral disk)
+# ---------------------------------------------------------------------------
+# To use MySQL locally, set DB_ENGINE=django.db.backends.mysql in your .env
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'hms_db',
-        'USER': 'root',
-        'PASSWORD': 'Rohith@2610',
-        'HOST': 'localhost',
-        'PORT': '3306',
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+if DB_ENGINE == 'django.db.backends.mysql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME', 'hms_db'),
+            'USER': os.getenv('DB_USER', 'root'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
-
+# ---------------------------------------------------------------------------
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+# ---------------------------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
+# ---------------------------------------------------------------------------
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
+# ---------------------------------------------------------------------------
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
+# ---------------------------------------------------------------------------
+# Static files — WhiteNoise serves them in production without a CDN
+# ---------------------------------------------------------------------------
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-STATIC_URL = 'static/'
+# WhiteNoise: compress and cache static files for performance
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
+# ---------------------------------------------------------------------------
+# CORS — allow the frontend origin
+# ---------------------------------------------------------------------------
+
+# In production: set FRONTEND_URL=https://your-frontend.onrender.com on Render.
+# In development: defaults allow the Vite dev server.
+FRONTEND_URL = os.getenv('FRONTEND_URL', '')
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
@@ -143,6 +157,30 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5175',
 ]
 
+if FRONTEND_URL:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+
+# Allow all origins only in local dev (DEBUG=True)
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+
+# ---------------------------------------------------------------------------
+# CSRF — must trust the backend's own Render domain for POST requests
+# ---------------------------------------------------------------------------
+
+# Set CSRF_TRUSTED_ORIGINS to your Render backend domain, e.g.:
+#   https://hms-backend.onrender.com
+# Multiple origins can be comma-separated.
+_csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+
+# Also add frontend URL so browser form POSTs are trusted
+if FRONTEND_URL and FRONTEND_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(FRONTEND_URL)
+
+# ---------------------------------------------------------------------------
+# Django REST Framework
+# ---------------------------------------------------------------------------
+
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
@@ -150,3 +188,19 @@ REST_FRAMEWORK = {
 }
 
 APPEND_SLASH = True
+
+# ---------------------------------------------------------------------------
+# HTTPS / Security hardening (auto-enabled in production when DEBUG=False)
+# Render terminates TLS at the edge, so these settings are safe to enable.
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000        # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+

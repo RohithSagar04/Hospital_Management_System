@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Activity, Stethoscope, BadgeCheck, Lock, Eye, EyeOff, Mail, Phone, Hash, IndianRupee } from 'lucide-react'
+import { Stethoscope, BadgeCheck, Lock, Eye, EyeOff, Mail, Phone, Hash, IndianRupee } from 'lucide-react'
 import { registerDoctor } from '../api'
 
 export default function DoctorRegisterPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
-    name: '', specialization: '', email: '', phone: '',
+    name: '', specialization: '', designation: '', email: '', phone: '',
     registration_number: '', consultation_fee: '', password: '', confirmPassword: '',
   })
   const [showPwd, setShowPwd] = useState(false)
@@ -25,13 +25,17 @@ export default function DoctorRegisterPage() {
     setLoading(true); setError('')
     try {
       await registerDoctor({
-        name: form.name, specialization: form.specialization,
-        email: form.email, phone: form.phone,
+        name: form.name,
+        specialization: form.specialization,
+        designation: form.designation,
+        email: form.email,
+        phone: form.phone,
         registration_number: form.registration_number,
         consultation_fee: Number(form.consultation_fee) || 0,
         password: form.password,
       })
       setSuccess(true)
+      setTimeout(() => navigate('/doctor-login'), 2000)
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Registration failed. Please try again.')
     }
@@ -45,10 +49,10 @@ export default function DoctorRegisterPage() {
           <div className="rounded-full bg-amber-500/15 border border-amber-500/30 p-6 inline-flex mb-5">
             <BadgeCheck size={52} className="text-amber-400" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-100 mb-2">Registration Submitted!</h2>
+          <h2 className="text-2xl font-bold text-slate-100 mb-2">Registration Successful!</h2>
           <p className="text-slate-400 text-sm mb-6">
-            Your account is <span className="text-amber-300 font-semibold">pending admin approval</span>.
-            You will be able to log in once the admin approves your registration.
+            Your account has been <span className="text-emerald-400 font-semibold">auto-approved</span>. 
+            Redirecting you to login...
           </p>
           <Link to="/doctor-login" className="btn px-8 py-3 text-base font-semibold inline-block">
             Go to Doctor Login →
@@ -74,11 +78,11 @@ export default function DoctorRegisterPage() {
             Join our <span className="text-violet-400">medical team.</span>
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed mb-8">
-            Register your credentials. Once approved by the hospital admin, you'll get full access to patient records, appointments, prescriptions, and diagnostics.
+            Register your credentials. Our system now supports auto-approval for immediate access to patient records, appointments, and diagnostics.
           </p>
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-            <p className="text-xs text-amber-300 font-semibold mb-1">⏳ Approval Required</p>
-            <p className="text-xs text-slate-400">Your registration will be reviewed by the admin before you can log in. This typically takes 1–2 business days.</p>
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+            <p className="text-xs text-emerald-300 font-semibold mb-1">⚡ Instant Activation</p>
+            <p className="text-xs text-slate-400">Doctors are now automatically approved upon registration for a seamless onboarding experience.</p>
           </div>
         </div>
         <p className="text-xs text-slate-600">© 2026 Hospital Management System</p>
@@ -91,7 +95,7 @@ export default function DoctorRegisterPage() {
             <div className="rounded-xl bg-violet-500/15 p-2"><Stethoscope size={22} className="text-violet-400" /></div>
             <h2 className="text-2xl font-bold text-slate-100">Doctor Registration</h2>
           </div>
-          <p className="text-slate-400 text-sm mb-6 ml-1">Fill in your details to request access to the doctor portal.</p>
+          <p className="text-slate-400 text-sm mb-6 ml-1">Fill in your details to create your doctor profile.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -106,9 +110,9 @@ export default function DoctorRegisterPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5"><Mail size={11} className="inline mr-1" />Email *</label>
-                <input className="input w-full" type="email" placeholder="doctor@hospital.com" value={form.email} onChange={set('email')} required />
+               <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Designation</label>
+                <input className="input w-full" placeholder="Consultant / Senior Resident" value={form.designation} onChange={set('designation')} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5"><Phone size={11} className="inline mr-1" />Phone</label>
@@ -118,13 +122,18 @@ export default function DoctorRegisterPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5"><Mail size={11} className="inline mr-1" />Email *</label>
+                <input className="input w-full" type="email" placeholder="doctor@hospital.com" value={form.email} onChange={set('email')} required />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5"><Hash size={11} className="inline mr-1" />Medical Reg. Number</label>
                 <input className="input w-full" placeholder="MCI-XXXXXX" value={form.registration_number} onChange={set('registration_number')} />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5"><IndianRupee size={11} className="inline mr-1" />Consultation Fee (₹)</label>
-                <input className="input w-full" type="number" placeholder="500" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} />
-              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5"><IndianRupee size={11} className="inline mr-1" />Consultation Fee (₹)</label>
+              <input className="input w-full" type="number" placeholder="500" min="0" value={form.consultation_fee} onChange={set('consultation_fee')} />
             </div>
 
             <div className="pt-2 border-t border-slate-800">

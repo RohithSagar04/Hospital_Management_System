@@ -1,11 +1,12 @@
 import { useMemo, useState, useEffect } from 'react'
-import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { NavLink, Route, Routes, useNavigate, Navigate } from 'react-router-dom'
 import { Activity, CreditCard, FlaskConical, LayoutDashboard, Pill, Stethoscope, UserRound, UserPlus, LogOut, LogIn } from 'lucide-react'
 
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DoctorLoginPage from './pages/DoctorLoginPage'
 import DoctorRegisterPage from './pages/DoctorRegisterPage'
+import AdminLoginPage from './pages/AdminLoginPage'
 import PatientDashboard from './pages/PatientDashboard'
 import DoctorDashboard from './pages/DoctorDashboard'
 import PharmacyDashboard from './pages/PharmacyDashboard'
@@ -46,6 +47,10 @@ function MainApp() {
     ? (JSON.parse(storedDoctor) as { profile: { doctor_name: string; specialization: string }; doctor: { id: number } })
     : null
 
+  const storedAdmin = localStorage.getItem('hms_admin')
+  const isAdmin = storedAdmin === 'true'
+  const adminUser = localStorage.getItem('hms_admin_user') || 'admin'
+
   const handleDoctorLogout = () => {
     localStorage.removeItem('hms_doctor')
     setPatientKey(k => k + 1)
@@ -56,6 +61,13 @@ function MainApp() {
     localStorage.removeItem('hms_patient')
     setPatientKey(k => k + 1)   // force header re-render
     navigate('/login')
+  }
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('hms_admin')
+    localStorage.removeItem('hms_admin_user')
+    setPatientKey(k => k + 1)
+    navigate('/admin-login')
   }
 
   return (
@@ -183,6 +195,29 @@ function MainApp() {
               </button>
             </div>
           )}
+
+          {/* Admin card in sidebar */}
+          {isAdmin ? (
+            <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <LayoutDashboard size={13} className="text-indigo-400" />
+                <span className="text-xs font-semibold text-indigo-300">Active Admin</span>
+              </div>
+              <p className="text-sm font-bold text-slate-100 truncate">Operator: {adminUser}</p>
+              <button onClick={handleAdminLogout}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition">
+                <LogOut size={11} /> Admin Logout
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/5 p-3 text-center space-y-2">
+              <p className="text-xs text-slate-400">Admin portal</p>
+              <button onClick={() => navigate('/admin-login')}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 px-3 py-1.5 text-xs text-indigo-300 hover:bg-indigo-600/30 transition font-medium">
+                <LogIn size={11} /> Operator Login
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main content */}
@@ -193,7 +228,7 @@ function MainApp() {
             <Route path="/pharmacy" element={<PharmacyDashboard />} />
             <Route path="/diagnosis" element={<DiagnosisDashboard />} />
             <Route path="/billing" element={<BillingDashboard />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" replace />} />
           </Routes>
         </main>
       </div>
@@ -209,6 +244,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/doctor-login" element={<DoctorLoginPage />} />
       <Route path="/doctor-register" element={<DoctorRegisterPage />} />
+      <Route path="/admin-login" element={<AdminLoginPage />} />
       <Route path="/*" element={<MainApp />} />
     </Routes>
   )

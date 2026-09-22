@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-export const api = axios.create({ baseURL: 'http://127.0.0.1:8000/api' })
+// In production (Render): set VITE_API_URL=https://your-backend.onrender.com/api
+// In local dev: falls back to http://127.0.0.1:8000/api
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api'
+
+export const api = axios.create({ baseURL: BASE_URL })
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface Patient {
@@ -80,6 +84,7 @@ export interface DoctorProfile {
   doctor_id: number
   doctor_name: string
   specialization: string
+  doctor_designation: string
   consultation_fee: string
   email: string
   phone: string
@@ -114,11 +119,20 @@ export interface BillingRecord {
 }
 
 export interface AdminSummary {
-  total_patients: number
-  total_doctors: number
-  total_appointments: number
-  appointments_by_doctor: { id: number; name: string; specialization: string; total: number }[]
-  recent_appointments: Appointment[]
+  total_patients: number;
+  total_doctors: number;
+  total_appointments: number;
+  appointments_by_doctor: { id: number; name: string; specialization: string; total: number }[];
+  recent_appointments: Appointment[];
+  doctor_designations: { designation: string; total: number }[];
+  doctor_specializations: { specialization: string; total: number }[];
+  doctors_by_specialization: {
+    specialization: string;
+    doctors: { id: number; name: string; designation: string; consultation_fee: string }[];
+  }[];
+  appointments_by_specialization: { specialization: string; total: number }[];
+  appointments_by_status: { status: string; total: number }[];
+  appointments_trend: { date: string; total: number }[];
 }
 
 // ── API functions ──────────────────────────────────────────────────────────
@@ -138,6 +152,9 @@ export const getAppointments = (params?: { patient_id?: string; doctor?: number 
 
 export const createAppointment = (data: { patient: number; doctor: number; date: string; status?: string }) =>
   api.post<Appointment>('/appointments/', data)
+
+export const updateAppointment = (id: number, data: Partial<Appointment>) =>
+  api.patch<Appointment>(`/appointments/${id}/`, data)
 
 export const getConsultations = (params?: { patient_id?: string; doctor?: number }) =>
   api.get<ConsultationNote[]>('/consultations/', { params })
@@ -188,7 +205,7 @@ export const loginPatient = (patient_id: string, password: string) =>
 
 // ── Doctor auth ────────────────────────────────────────────────────────────
 export const registerDoctor = (data: {
-  name: string; specialization: string; consultation_fee: number
+  name: string; specialization: string; designation?: string; consultation_fee: number
   email: string; phone: string; registration_number: string; password: string
 }) => api.post<{ message: string; profile: DoctorProfile }>('/doctor-register/', data)
 
@@ -205,3 +222,18 @@ export const approveDoctor = (profileId: number, action: 'approve' | 'reject') =
 // ── Lab report dispatch ────────────────────────────────────────────────────
 export const sendLabReport = (testId: number) =>
   api.patch<DiagnosticTest>(`/send-lab-report/${testId}/`)
+
+// ── Doctor management (admin) ──────────────────────────────────────────────
+export const deleteDoctor = (doctorId: number) =>
+  api.delete<{ message: string }>(`/delete-doctor/${doctorId}/`)
+
+export const setDoctorCredentials = (data: {
+  doctor_id: number
+  email: string
+  password?: string
+  phone?: string
+  registration_number?: string
+}) => api.post<{ message: string; profile: DoctorProfile }>('/set-doctor-credentials/', data)
+
+export const loginAdmin = (username: string, password: string) =>
+  api.post<{ message: string; username: string; email: string; is_admin: boolean }>('/admin-login/', { username, password })

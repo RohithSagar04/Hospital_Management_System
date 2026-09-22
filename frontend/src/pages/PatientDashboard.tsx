@@ -12,6 +12,22 @@ import {
   type ConsultationNote, type Prescription, type DiagnosticTest, type PharmacyDispense,
 } from '../api'
 
+const DEPARTMENT_IMAGES: Record<string, string> = {
+  cardiology: 'https://images.unsplash.com/photo-1628348068343-c6a848d2b6dd?auto=format&fit=crop&w=600&q=80',
+  neurology: 'https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&w=600&q=80',
+  pediatrics: 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&w=600&q=80',
+  orthopedics: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&q=80',
+  dermatology: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80',
+  'general medicine': 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
+  general: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
+  gynecology: 'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=600&q=80',
+  ophthalmology: 'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=600&q=80',
+  oncology: 'https://images.unsplash.com/photo-1579154204601-01588f35116f?auto=format&fit=crop&w=600&q=80',
+  psychiatry: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=600&q=80',
+  ent: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=600&q=80',
+  default: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
+}
+
 interface ChatMsg { role: 'user' | 'bot'; text: string }
 type HistoryTab = 'notes' | 'prescriptions' | 'labs' | 'medicines' | 'appointments'
 
@@ -141,7 +157,14 @@ export default function PatientDashboard() {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="relative min-h-screen rounded-2xl border border-slate-800 bg-slate-950/60 backdrop-blur-sm overflow-hidden p-6">
+      {/* Professional Dashboard Background Image */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-10 bg-no-repeat bg-cover bg-center"
+        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1600&q=80')` }}
+      />
+
+      <div className="relative z-10 space-y-5">
 
       {/* ── 1. Patient ID Card ── */}
       <div className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-cyan-950/40 via-slate-900/80 to-slate-900/70 p-6 shadow-lg">
@@ -346,27 +369,57 @@ export default function PatientDashboard() {
         </div>
         {doctors.length === 0 ? <p className="text-slate-500 text-sm">No doctors available. Please check with admin.</p> : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {doctors.map(d => (
-              <div key={d.id} className={`rounded-xl border p-4 transition-all ${bookingDoctor?.id === d.id ? 'border-violet-500/50 bg-violet-500/10' : 'border-slate-700 bg-slate-800/40 hover:border-slate-600'}`}>
-                <p className="font-semibold text-slate-100 leading-tight">{d.name}</p>
-                <p className="text-xs text-violet-300 mt-0.5">{d.specialization}</p>
-                <p className="text-xs text-slate-400 mt-1.5">Fee: <span className="text-cyan-300 font-semibold">₹{d.consultation_fee}</span></p>
-                {bookingDoctor?.id !== d.id ? (
-                  <button className="mt-3 btn text-xs py-1.5 px-3 w-full" onClick={() => { setBookingDoctor(d); setBookDate(new Date().toISOString().split('T')[0]) }}>
-                    Book Appointment
-                  </button>
-                ) : (
-                  <form onSubmit={bookAppointment} className="mt-3 space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs text-violet-300"><Clock size={11} /> Select date</div>
-                    <input type="date" className="input w-full text-sm py-1.5" value={bookDate} onChange={e => setBookDate(e.target.value)} min={new Date().toISOString().split('T')[0]} required />
-                    <div className="flex gap-2">
-                      <button type="submit" className="btn text-xs py-1.5 px-3 flex-1" disabled={bookingLoading}>{bookingLoading ? 'Booking…' : '✓ Confirm'}</button>
-                      <button type="button" onClick={() => setBookingDoctor(null)} className="btn bg-slate-700 hover:bg-slate-600 text-slate-100 text-xs py-1.5 px-3">Cancel</button>
+            {doctors.map(d => {
+              const imgUrl = DEPARTMENT_IMAGES[d.specialization.toLowerCase()] || DEPARTMENT_IMAGES.default
+              return (
+                <div key={d.id} className={`rounded-xl border overflow-hidden transition-all duration-300 group ${bookingDoctor?.id === d.id ? 'border-violet-500 bg-slate-900 shadow-violet-500/10 shadow-lg animate-pulse-subtle' : 'border-slate-700 bg-slate-800/40 hover:border-slate-600 hover:shadow-md'}`}>
+                  {/* Card Header Background Image */}
+                  <div className="h-28 relative overflow-hidden">
+                    <div 
+                      className="absolute inset-0 transition-transform duration-750 ease-out group-hover:scale-105 pointer-events-none"
+                      style={{
+                        backgroundImage: `linear-gradient(to bottom, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.85)), url(${imgUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    />
+                    {/* Badge on top right */}
+                    <div className="absolute top-2.5 right-2.5 relative z-10">
+                      <span className="text-[9px] uppercase font-bold tracking-wider rounded-lg px-2 py-1 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 text-cyan-300">
+                        {d.specialization}
+                      </span>
                     </div>
-                  </form>
-                )}
-              </div>
-            ))}
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-4 space-y-2">
+                    <div>
+                      <p className="font-semibold text-slate-100 text-sm leading-tight group-hover:text-violet-300 transition-colors">{d.name}</p>
+                      <p className="text-xs text-slate-400 mt-1">Specialist in {d.specialization}</p>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-700/40 pt-2.5 mt-2">
+                      <span className="text-xs text-slate-400">Consultation Fee</span>
+                      <span className="text-sm text-emerald-300 font-bold">₹{d.consultation_fee}</span>
+                    </div>
+
+                    {bookingDoctor?.id !== d.id ? (
+                      <button className="mt-3 btn text-xs py-2 w-full font-semibold transition bg-violet-600 hover:bg-violet-500 text-white" onClick={() => { setBookingDoctor(d); setBookDate(new Date().toISOString().split('T')[0]) }}>
+                        Book Appointment
+                      </button>
+                    ) : (
+                      <form onSubmit={bookAppointment} className="mt-3 space-y-2 pt-2 border-t border-slate-700/40">
+                        <div className="flex items-center gap-1.5 text-xs text-violet-300"><Clock size={11} /> Select date</div>
+                        <input type="date" className="input w-full text-sm py-1.5" value={bookDate} onChange={e => setBookDate(e.target.value)} min={new Date().toISOString().split('T')[0]} required />
+                        <div className="flex gap-2">
+                          <button type="submit" className="btn text-xs py-1.5 px-3 flex-1 font-semibold" disabled={bookingLoading}>{bookingLoading ? 'Booking…' : '✓ Confirm'}</button>
+                          <button type="button" onClick={() => setBookingDoctor(null)} className="btn bg-slate-700 hover:bg-slate-600 text-slate-100 text-xs py-1.5 px-3">Cancel</button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -398,6 +451,7 @@ export default function PatientDashboard() {
         </div>
       </div>
 
+      </div> {/* relative z-10 space-y-5 */}
     </div>
   )
 }

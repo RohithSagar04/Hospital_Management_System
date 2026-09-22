@@ -30,12 +30,17 @@ export default function RegisterPage() {
     try {
       const token = Math.floor(1000 + Math.random() * 9000)
       const patientId = `PT-${Date.now().toString().slice(-6)}`
-      const res = await registerPatient({ name, age: Number(age), gender, phone, address, patient_id: patientId, token_number: token, password })
-      localStorage.setItem('hms_patient', JSON.stringify(res.data))
-      setRegistered(res.data)
-      setTimeout(() => navigate('/'), 3000)
-    } catch {
-      setError('Registration failed. Please check your details and try again.')
+      const res = await registerPatient({ name, age: Number(age), gender, phone, address, patient_id: patientId, token_number: token, password } as any)
+      if (res.data && res.data.patient_id) {
+        localStorage.setItem('hms_patient', JSON.stringify(res.data))
+        setRegistered(res.data)
+        setTimeout(() => navigate('/'), 3000)
+      } else {
+        setError('Registration failed. Invalid response from server.')
+      }
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.error || err?.message || 'Registration failed. Please check your details and try again.'
+      setError(errorMessage)
     }
     setLoading(false)
   }

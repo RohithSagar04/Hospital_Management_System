@@ -1,0 +1,43 @@
+# ── Render Blueprint ─────────────────────────────────────────────────────────
+# Defines both the Django backend (Web Service) and React frontend (Static Site).
+# Push this file to GitHub, then connect the repo on Render → New → Blueprint.
+
+services:
+  # ── Backend: Django REST API ─────────────────────────────────────────────
+  - type: web
+    name: hms-backend
+    runtime: python
+    rootDir: .
+    buildCommand: ./build.sh
+    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    plan: free
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render auto-generates a secure random value
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: FRONTEND_URL
+        value: https://hms-frontend.onrender.com   # Update to your actual frontend URL
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://hms-backend.onrender.com,https://hms-frontend.onrender.com
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+
+  # ── Frontend: React + Vite static site ──────────────────────────────────
+  - type: web
+    name: hms-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    plan: free
+    envVars:
+      - key: VITE_API_URL
+        value: https://hms-backend.onrender.com/api   # Update to your actual backend URL
+    routes:
+      # SPA fallback: serve index.html for all unmatched routes (React Router)
+      - type: rewrite
+        source: /*
+        destination: /index.html
