@@ -10,10 +10,10 @@ services:
     rootDir: .
     buildCommand: ./build.sh
     startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
-    plan: free
+    plan: starter                        # Render's lowest paid tier ($7/mo); remove to pick manually
     envVars:
       - key: SECRET_KEY
-        generateValue: true          # Render auto-generates a secure random value
+        generateValue: true              # Render auto-generates a secure random value
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
@@ -28,11 +28,10 @@ services:
   # ── Frontend: React + Vite static site ──────────────────────────────────
   - type: web
     name: hms-frontend
-    runtime: static
+    runtime: static                      # Static sites are always free — no plan field
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
-    plan: free
     envVars:
       - key: VITE_API_URL
         value: https://hms-backend.onrender.com/api   # Update to your actual backend URL
