@@ -23,7 +23,7 @@ services:
       - key: CSRF_TRUSTED_ORIGINS
         value: https://hms-backend.onrender.com,https://hms-frontend.onrender.com
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.12.0"
 
   # ── Frontend: React + Vite static site ──────────────────────────────────
   - type: web
